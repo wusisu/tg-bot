@@ -1,2 +1,4 @@
 db.sqlite
 config.yml
+TgBotSyncSettings.ffs_gui
+TgBotSyncSettings.ffs_batch
