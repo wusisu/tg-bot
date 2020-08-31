@@ -29,7 +29,7 @@ func NewApp() *App {
 	return &App{}
 }
 
-func (app *App) readUpdates() {
+func (app *App) readUpdates() (err error) {
 	u := tgbotapi.NewUpdate(0)
 	u.Timeout = 60
 
@@ -51,17 +51,36 @@ func (app *App) readUpdates() {
 			updateJ, _ := json.Marshal(update)
 			log.Debugf("Receive Update %s", updateJ)
 
-			app.readMessage(update.Message)
+			err := app.readMessage(update.Message)
+			if err != nil {
+				log.Error(err)
+				continue
+			}
 
 		}
 	}
+	return
 }
 
-func (app *App) readMessage(msg *tgbotapi.Message) error {
-	return app.readPhotos(msg)
+func (app *App) readMessage(msg *tgbotapi.Message) (err error) {
+	err = app.readPhotos(msg)
+	if err != nil {
+		err = app.readDocument(msg)
+	}
+	return err
 }
 
-func (app *App) readPhotos(msg *tgbotapi.Message) error {
+func (app *App) readDocument(msg *tgbotapi.Message) (err error) {
+	doc := msg.Document
+	if doc == nil {
+
+		return nil
+	}
+
+	return nil
+}
+
+func (app *App) readPhotos(msg *tgbotapi.Message) (err error) {
 	phs := msg.Photo
 	if phs == nil || len(*phs) == 0 {
 		return nil
@@ -76,27 +95,24 @@ func (app *App) readPhotos(msg *tgbotapi.Message) error {
 	f, err := app.bot.GetFile(tgbotapi.FileConfig{FileID: ph.FileID})
 	if err != nil {
 		log.Debugf("failed to downlaod [%s]", ph.FileID)
-		return err
+		return
 	}
 	url := f.Link(viper.GetString("BotToken"))
 	log.Debugf("Download image %s", url)
-	app.saveFile(url, ph)
-	return nil
+	return app.saveFile(url, new(FileInfo).FromPhotoSize(ph))
 }
 
-func (app *App) saveFile(url string, ph tgbotapi.PhotoSize) {
-	has, err := app.db.Where("file_i_d = ?", ph.FileID).Exist(&File{})
+func (app *App) saveFile(url string, fi FileInfo) (err error) {
+	has, err := app.db.Where("file_i_d = ?", fi.FileID).Exist(&File{})
 	if err != nil {
-		log.Error(err)
 		return
 	}
 	if has {
-		log.Infof("FileID exists %s", ph.FileID)
+		log.Infof("FileID exists %s", fi.FileID)
 		return
 	}
 	has, err = app.db.Where("download_u_r_l = ?", url).Exist(&File{})
 	if err != nil {
-		log.Error(err)
 		return
 	}
 	if has {
@@ -106,14 +122,12 @@ func (app *App) saveFile(url string, ph tgbotapi.PhotoSize) {
 
 	resp, err := http.Get(url)
 	if err != nil {
-		log.Panicf("fetch: %v\n", err)
-		os.Exit(1)
+		return
 	}
 	b, err := ioutil.ReadAll(resp.Body)
 	resp.Body.Close()
 	if err != nil {
-		log.Panicf("fetch: reading %s: %v\n", url, err)
-		os.Exit(1)
+		return
 	}
 	h := md5.New()
 	h.Write(b)
@@ -121,7 +135,6 @@ func (app *App) saveFile(url string, ph tgbotapi.PhotoSize) {
 	md5 := hex.EncodeToString(md5sum)
 	has, err = app.db.Where("md5 = ?", md5).Exist(&File{})
 	if err != nil {
-		log.Error(err)
 		return
 	}
 	if has {
@@ -135,7 +148,7 @@ func (app *App) saveFile(url string, ph tgbotapi.PhotoSize) {
 	fn := path.Join(viper.GetString("DownloadDir"), outputName)
 	fo, err := os.Create(fn)
 	if err != nil {
-		panic(err)
+		return
 	}
 	defer func() {
 		if err := fo.Close(); err != nil {
@@ -148,14 +161,14 @@ func (app *App) saveFile(url string, ph tgbotapi.PhotoSize) {
 	fo.Write(b)
 	f := File{}
 	f.Md5 = md5
-	f.FileID = ph.FileID
-	f.FileSize = ph.FileSize
+	f.FileID = fi.FileID
+	f.FileSize = fi.FileSize
 	f.OutputName = outputName
 	f.DownloadURL = url
 	affect, err := app.db.Insert(&f)
 	if err != nil {
-		log.Error(err)
 		return
 	}
 	log.Debugf("%d item insert to db", affect)
+	return
 }
