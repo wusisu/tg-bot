@@ -48,30 +48,40 @@ func (app *App) readUpdates() {
 
 			// app.bot.Send(msg)
 
-			phs := update.Message.Photo
-			if phs == nil || len(*phs) == 0 {
-				updateJ, _ := json.Marshal(update)
-				log.Debugf("no photos in %s", updateJ)
-				continue
-			}
-			ph := (*phs)[len(*phs)-1]
-			// for _, ph := range *phs {
+			updateJ, _ := json.Marshal(update)
+			log.Debugf("Receive Update %s", updateJ)
 
-			log.Debugf("[%d] %s %v", ph.FileSize, ph.FileID, ph)
-
-			// }
-
-			f, err := app.bot.GetFile(tgbotapi.FileConfig{FileID: ph.FileID})
-			if err != nil {
-				log.Debugf("failed to downlaod [%s]", ph.FileID)
-				continue
-			}
-			url := f.Link(viper.GetString("BotToken"))
-			log.Debugf("Download image %s", url)
-			app.saveFile(url, ph)
+			app.readMessage(update.Message)
 
 		}
 	}
+}
+
+func (app *App) readMessage(msg *tgbotapi.Message) error {
+	return app.readPhotos(msg)
+}
+
+func (app *App) readPhotos(msg *tgbotapi.Message) error {
+	phs := msg.Photo
+	if phs == nil || len(*phs) == 0 {
+		return nil
+	}
+	ph := (*phs)[len(*phs)-1]
+	// for _, ph := range *phs {
+
+	log.Debugf("[%d] %s %v", ph.FileSize, ph.FileID, ph)
+
+	// }
+
+	f, err := app.bot.GetFile(tgbotapi.FileConfig{FileID: ph.FileID})
+	if err != nil {
+		log.Debugf("failed to downlaod [%s]", ph.FileID)
+		return err
+	}
+	url := f.Link(viper.GetString("BotToken"))
+	log.Debugf("Download image %s", url)
+	app.saveFile(url, ph)
+	return nil
 }
 
 func (app *App) saveFile(url string, ph tgbotapi.PhotoSize) {
