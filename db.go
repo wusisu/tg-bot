@@ -15,10 +15,25 @@ type File struct {
 	FileSize    int
 	OriginName  string
 	MimeType    string
+	Duration    int
+	Width       int
+	Height      int
 	OutputName  string `xorm:"varchar(200)"`
 	DownloadURL string
 	Created     time.Time `xorm:"created"`
 	Updated     time.Time `xorm:"updated"`
+}
+
+// FromFileInfo read from FileInfo
+func (f File) FromFileInfo(fi FileInfo) File {
+	f.FileID = fi.FileID
+	f.FileSize = fi.FileSize
+	f.OriginName = fi.FileName
+	f.MimeType = fi.MimeType
+	f.Duration = fi.Duration
+	f.Width = fi.Width
+	f.Height = fi.Height
+	return f
 }
 
 // ConnectDB ...

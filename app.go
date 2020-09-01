@@ -66,6 +66,9 @@ func (app *App) readMessage(msg *tgbotapi.Message) (err error) {
 	if err == nil {
 		err = app.readDocument(msg)
 	}
+	if err == nil {
+		err = app.readVideo(msg)
+	}
 	return
 }
 
@@ -86,10 +89,19 @@ func (app *App) readPhotos(msg *tgbotapi.Message) (err error) {
 	ph := (*phs)[len(*phs)-1]
 	// for _, ph := range *phs {
 
-	log.Debugf("Wanted Photo [%d] %s %v", ph.FileSize, ph.FileID, ph)
+	log.Debugf("read Photo [%d] %s %v", ph.FileSize, ph.FileID, ph)
 
 	// }
 	return app.saveFile(new(FileInfo).FromPhotoSize(ph))
+}
+
+func (app *App) readVideo(msg *tgbotapi.Message) (err error) {
+	v := msg.Video
+	if v == nil {
+		return nil
+	}
+	log.Debug("read Video")
+	return app.saveFile(new(FileInfo).FromVideo(v))
 }
 
 func (app *App) saveFile(fi FileInfo) (err error) {
@@ -103,7 +115,7 @@ func (app *App) saveFile(fi FileInfo) (err error) {
 	}
 	tgFile, err := app.bot.GetFile(tgbotapi.FileConfig{FileID: fi.FileID})
 	if err != nil {
-		log.Debugf("failed to downlaod [%s]", fi.FileID)
+		log.Errorf("failed to downlaod [%s]", fi.FileID)
 		return
 	}
 	url := tgFile.Link(viper.GetString("BotToken"))
@@ -156,12 +168,8 @@ func (app *App) saveFile(fi FileInfo) (err error) {
 	// w.Write(b)
 	// w.Flush()
 	fo.Write(b)
-	f := File{}
+	f := new(File).FromFileInfo(fi)
 	f.Md5 = md5
-	f.FileID = fi.FileID
-	f.FileSize = fi.FileSize
-	f.OriginName = fi.FileName
-	f.MimeType = fi.MimeType
 	f.OutputName = outputName
 	f.DownloadURL = url
 	affect, err := app.db.Insert(&f)
