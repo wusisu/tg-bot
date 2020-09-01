@@ -56,7 +56,6 @@ func (app *App) readUpdates() (err error) {
 				log.Error(err)
 				continue
 			}
-
 		}
 	}
 	return
@@ -64,20 +63,19 @@ func (app *App) readUpdates() (err error) {
 
 func (app *App) readMessage(msg *tgbotapi.Message) (err error) {
 	err = app.readPhotos(msg)
-	if err != nil {
+	if err == nil {
 		err = app.readDocument(msg)
 	}
-	return err
+	return
 }
 
 func (app *App) readDocument(msg *tgbotapi.Message) (err error) {
 	doc := msg.Document
 	if doc == nil {
-
 		return nil
 	}
-
-	return nil
+	log.Debug("read Document")
+	return app.saveFile(new(FileInfo).FromDocument(msg.Document))
 }
 
 func (app *App) readPhotos(msg *tgbotapi.Message) (err error) {
@@ -88,21 +86,13 @@ func (app *App) readPhotos(msg *tgbotapi.Message) (err error) {
 	ph := (*phs)[len(*phs)-1]
 	// for _, ph := range *phs {
 
-	log.Debugf("[%d] %s %v", ph.FileSize, ph.FileID, ph)
+	log.Debugf("Wanted Photo [%d] %s %v", ph.FileSize, ph.FileID, ph)
 
 	// }
-
-	f, err := app.bot.GetFile(tgbotapi.FileConfig{FileID: ph.FileID})
-	if err != nil {
-		log.Debugf("failed to downlaod [%s]", ph.FileID)
-		return
-	}
-	url := f.Link(viper.GetString("BotToken"))
-	log.Debugf("Download image %s", url)
-	return app.saveFile(url, new(FileInfo).FromPhotoSize(ph))
+	return app.saveFile(new(FileInfo).FromPhotoSize(ph))
 }
 
-func (app *App) saveFile(url string, fi FileInfo) (err error) {
+func (app *App) saveFile(fi FileInfo) (err error) {
 	has, err := app.db.Where("file_i_d = ?", fi.FileID).Exist(&File{})
 	if err != nil {
 		return
@@ -111,6 +101,13 @@ func (app *App) saveFile(url string, fi FileInfo) (err error) {
 		log.Infof("FileID exists %s", fi.FileID)
 		return
 	}
+	tgFile, err := app.bot.GetFile(tgbotapi.FileConfig{FileID: fi.FileID})
+	if err != nil {
+		log.Debugf("failed to downlaod [%s]", fi.FileID)
+		return
+	}
+	url := tgFile.Link(viper.GetString("BotToken"))
+	log.Debugf("Download File %s", url)
 	has, err = app.db.Where("download_u_r_l = ?", url).Exist(&File{})
 	if err != nil {
 		return
@@ -163,6 +160,8 @@ func (app *App) saveFile(url string, fi FileInfo) (err error) {
 	f.Md5 = md5
 	f.FileID = fi.FileID
 	f.FileSize = fi.FileSize
+	f.OriginName = fi.FileName
+	f.MimeType = fi.MimeType
 	f.OutputName = outputName
 	f.DownloadURL = url
 	affect, err := app.db.Insert(&f)

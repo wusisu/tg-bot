@@ -13,6 +13,8 @@ type File struct {
 	Md5         string
 	FileID      string
 	FileSize    int
+	OriginName  string
+	MimeType    string
 	OutputName  string `xorm:"varchar(200)"`
 	DownloadURL string
 	Created     time.Time `xorm:"created"`

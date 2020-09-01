@@ -18,8 +18,10 @@ func (f FileInfo) FromPhotoSize(ph tgbotapi.PhotoSize) FileInfo {
 }
 
 // FromDocument read data from Document
-func (f FileInfo) FromDocument(doc tgbotapi.Document) FileInfo {
+func (f FileInfo) FromDocument(doc *tgbotapi.Document) FileInfo {
 	f.FileID = doc.FileID
 	f.FileSize = doc.FileSize
+	f.FileName = doc.FileName
+	f.MimeType = doc.MimeType
 	return f
 }
